@@ -10,7 +10,7 @@ execute:
   freeze: auto
 
 website:
-  title: "MCD_2026"
+  title: "MCD 2026"
   navbar:
     left:
       - href: index.qmd

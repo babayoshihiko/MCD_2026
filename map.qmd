@@ -114,15 +114,3 @@ jp_map <- addFullscreenControl(jp_map)
 ```{r echo=FALSE}
 jp_map
 ```
-
-
-Sources:
-
-* Tile: GeoSpatial Information Authority of Japan, https://maps.gsi.go.jp/development/ichiran.html
-
-* Municipalities: https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2025.html
-* Healthcare areas: https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A38-2020.html
-* Snowfall: https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A22-2016.html
-* Mountainous areas: https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A24-2016.html
-* Agricultural areas: https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A25-2016.html
-* Peninsula: https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A18-2016.html
