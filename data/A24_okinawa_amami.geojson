@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "A24_okinawa_amami",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::6668" } },
+"features": [
+
+]
+}

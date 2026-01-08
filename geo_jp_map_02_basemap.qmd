@@ -1,0 +1,332 @@
+---
+title: "Simplify polygons"
+---
+
+## Prerequisites
+
+```{r include=FALSE}
+library(here)
+library(dplyr)
+library(geojp)
+library(sf)
+library(tmap)   # map making package
+tmap_mode("plot")
+library(pdftools)
+library(magick)
+library(grid)   # to re-arrange maps
+library(gridExtra)
+```
+
+## Read data
+
+```{r}
+# N03_small <- sf::read_sf("shp/N03_small.geojson")
+N03_small <- sf::read_sf(here::here("data","N03_small_nori.geojson"))
+N03_okinawa_amami <- sf::read_sf(here::here("data","N03_okinawa_amami.geojson"))
+
+A38 <- sf::read_sf(here::here("data","A38_small.geojson"))
+# A38 <- sf::read_sf(here::here("data","A38_small_nori.geojson"))
+A38_noncentre <- dplyr::filter(A38, 
+                      A38b_003 == 102 |
+                      A38b_003 == 103 |
+                      A38b_003 == 106 |
+                      A38b_003 == 108 |
+                      A38b_003 == 114 |
+                      A38b_003 == 115 |
+                      A38b_003 == 116 |
+                      A38b_003 == 1313 |
+                      A38b_003 == 1704 |
+                      A38b_003 == 1802 |
+                      A38b_003 == 1803 |
+                      A38b_003 == 1903 |
+                      A38b_003 == 2311 |
+                      A38b_003 == 2507 |
+                      A38b_003 == 2902 |
+                      A38b_003 == 2905 |
+                      A38b_003 == 4102 |
+                      A38b_003 == 4506  )
+#A38_noncentre <- sf::read_sf(here::here("data","A38_2020_nocentre.shp"))
+MCD <- sf::read_sf(here::here("data","MCD.csv", 
+        options = c("X_POSSIBLE_NAMES=X", "Y_POSSIBLE_NAMES=Y"), 
+        crs = 6668))
+MCD$Type <- ifelse(MCD$Type == 2, 1, MCD$Type)
+MCD$Type <- factor(MCD$Type, levels = c(1,3,4), labels=c("Core","Regional","Affiliated"))
+sfLabel <- sf::read_sf(here::here("data","label_SHA.geojson"))
+```
+
+## Ratio calculation
+
+```{r}
+jp_range = st_bbox(N03_small)["ymax"] - st_bbox(N03_small)["ymin"]
+okinawa_range = st_bbox(N03_okinawa_amami)["ymax"] - st_bbox(N03_okinawa_amami)["ymin"]
+jp_okinawa_ratio = okinawa_range / jp_range
+```
+
+## Functions
+
+```{r}
+create_jp_map <- function(title = "", 
+                          sf, 
+                          sf_title = "", 
+                          sf_col = "#ffcccc",
+                          sf_fill = "#ffcccc"){
+  jp_map <- tm_graticules(labels.size = 0.4) +
+    tm_shape(N03_small) +
+    tm_polygons(col = "grey",
+              fill = "white",
+              lwd = 0.1)
+  if (length(sf_fill) == 1){
+    jp_map <- jp_map + tm_shape(sf) +
+    tm_polygons(
+                fill = sf_fill,
+                col = sf_col,
+                lwd = 0) + 
+    tm_add_legend(type = "polygons", 
+            fill = sf_fill,
+            col = sf_col,
+            alpha = 1,
+            lwd = 0,
+            title = sf_title)
+  } else{
+    print("Multiple fill")
+    jp_map <- jp_map + tm_shape(sf) +
+      tm_polygons(fill = "Snowfall",
+                fill.scale = tm_scale(values = sf_fill),
+                fill_alpha = 0.5,
+                col = sf_col,
+                lwd = 0.1)
+  }
+    jp_map <- jp_map + tm_shape(MCD) + 
+    tm_symbols(fill = "Type",
+               fill.scale = tm_scale(values = c("#e853b2", "#2e33a6", "#459a64") ),
+               col = "white",
+               size = 0.2,
+               lwd = 0.1,
+               fill.legend = tm_legend(title = "Medical Centres for Dementia")) +
+    tm_shape(A38_noncentre) +
+    tm_borders(col = "red", lwd = 1) + 
+    tm_add_legend(type = "borders", 
+            col = "red",
+            lwd = 1,
+            title = "SHA with no MCD") +
+    tm_shape(sfLabel) +
+    tm_text(text = "SHA_name",
+            size = 0.4,
+            bgcol = "white",       # Background color
+            bgcol_alpha = 0.8) +   # Must be > 0 to see it
+    tm_scalebar(text.size = 0.6,
+                position = c("center", "bottom")) + 
+    # tm_compass(type = "4star", position = c("right", "center")) +
+    tm_title(title) +
+    tm_layout(legend.position = c("left","top"),
+              legend.bg.color = "white",
+              legend.title.size = 0.8,
+              legend.text.size = 0.8,
+              frame = FALSE)
+  return(jp_map)
+}
+```
+
+```{r}
+create_okinawa_map <- function(sf = NULL,
+                               sf_col = "#ffcccc",
+                          sf_fill = "#ffcccc"){
+  okinawa_map <- tm_shape(N03_okinawa_amami) +
+    tm_polygons(col = "grey",
+              fill = "white",
+              lwd = 0.1)
+  if (!is.null(sf)){
+    print("sf is not null")
+    okinawa_map <- okinawa_map + tm_shape(sf) +
+    tm_polygons(col = sf_col,
+                fill = sf_fill,
+                lwd = 0)
+  }
+  okinawa_map <- okinawa_map + tm_shape(MCD) + 
+    tm_symbols(fill = "Type",
+               fill.scale = tm_scale(values = c("#e853b2", "#2e33a6", "#459a64")),
+               col = "white",
+               size = 0.2,
+               lwd = 0.1,
+               fill.legend = tm_legend(show = FALSE)) +
+    tm_title("Okinawa and Amami") +
+    tm_layout(
+              frame = TRUE, bg.color = "white", 
+              title.size = 0.8,
+              title.position = c("left", "top"))
+  return(okinawa_map)
+}
+```
+
+```{r}
+save_pdf <- function(jp_map,
+                     okinawa_map,
+                     filename){
+  pdf(filename)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1, 1,
+                          heights = unit(c(jp_okinawa_ratio, 1), "null"))))
+  print(jp_map, vp = viewport(layout.pos.row = 1))
+  
+  print(okinawa_map, vp = viewport(x = 0.80, y = 0.2,
+                          height = jp_okinawa_ratio / sum(c(jp_okinawa_ratio, 1))))
+  dev.off()
+}
+```
+
+## Snowfall
+
+```{r}
+A22 <- sf::read_sf(here::here("data","A22_small.geojson"))
+A22$Snowfall <- factor(A22$A22_009,
+                        levels = c("1","2"),
+                        labels = c("Heavy","Extremely Heavy"))
+```
+
+```{r}
+jp_map <- create_jp_map(title = "A: Snowfall", 
+                        A22, 
+                        "Snowfall",
+                        "#666666",
+                        c("#8da5ed","#1a2a7f"))
+```
+```{r}
+okinawa_map <- create_okinawa_map()
+```
+
+```{r}
+save_pdf(jp_map,okinawa_map,here::here("output","Base_Snowfall.pdf")
+```
+
+## Mountainous
+
+```{r}
+A24 <- sf::read_sf(here::here("data","A24_small.geojson"))
+```
+
+```{r}
+jp_map <- create_jp_map(title = "B: Mountainous", 
+                        A24, 
+                        "Mountainous",
+                        "#e59866",
+                        "#e59866")
+```
+
+```{r}
+okinawa_map <- create_okinawa_map()
+```
+
+```{r}
+save_pdf(jp_map,okinawa_map,here::here("output","Base_Mountainous.pdf")
+```
+
+## Agricultural
+
+```{r}
+A25 <- sf::read_sf(here::here("data","A25_small.geojson"))
+A25_okinawa_amami <- sf::read_sf(here::here("data","A25_okinawa_amami.geojson"))
+```
+
+```{r}
+jp_map <- create_jp_map(title = "C: Agricultural", 
+                        A25, 
+                        "Agricultural",
+                        "#82e0aa",
+                        "#82e0aa")
+```
+
+```{r}
+okinawa_map <- create_okinawa_map(A25_okinawa_amami,"#82e0aa","#82e0aa")
+```
+```{r}
+save_pdf(jp_map,okinawa_map, here::here("output","Base_Agricultural.pdf"))
+```
+
+## Peninsula
+
+```{r}
+A18 <- sf::read_sf(here::here("data","A18_small.geojson"))
+```
+
+```{r}
+jp_map <- create_jp_map(title = "D: Peninsulas", 
+                        A18, 
+                        "Peninsula",
+                        "#d896ff",
+                        "#d896ff")
+```
+
+```{r}
+okinawa_map <- create_okinawa_map()
+```
+
+```{r}
+save_pdf(jp_map,okinawa_map, here::here("output","Base_Peninsula.pdf"))
+```
+
+## Remote Islands
+
+```{r}
+dfRI <- sf::read_sf(here::here("data","rito.csv"))
+# dfRI$code_pref_muni <- as.integer(dfRI$code_pref_muni)
+```
+
+```{r}
+sfRI_small <- dplyr::right_join(N03_small, dfRI,  
+        by = dplyr::join_by(N03_007 == code_pref_muni))
+sfRI_okinawa_amami <- dplyr::right_join(N03_okinawa_amami, dfRI,  
+        by = dplyr::join_by(N03_007 == code_pref_muni))
+```
+
+```{r}
+jp_map <- create_jp_map(title = "E: Municipalities with remote islands", 
+                        sfRI_small, 
+                        "Municipalities with Remote islands",
+                        "#66cccc",
+                        "#66cccc")
+```
+
+```{r}
+okinawa_map <- create_okinawa_map(
+                        sfRI_okinawa_amami, 
+                        "#66cccc",
+                        "#66cccc")
+```
+
+```{r}
+save_pdf(jp_map,okinawa_map,here::here("output","Base_RI.pdf"))
+```
+
+## Arrange
+
+```{r}
+library(pdftools)
+library(magick)
+library(grid)
+library(gridExtra)
+
+dpi <- 300
+
+# Example: Read each PDF as image
+img1 <- image_read(pdf_render_page(here::here("output","Base_Snowfall.pdf"), page = 1, dpi = dpi))
+img2 <- image_read(pdf_render_page(here::here("output","Base_Mountainous.pdf"), page = 1, dpi = dpi))
+img3 <- image_read(pdf_render_page(here::here("output","Base_Agricultural.pdf"), page = 1, dpi = dpi))
+img4 <- image_read(pdf_render_page(here::here("output","Base_Peninsula.pdf"), page = 1, dpi = dpi))
+img5 <- image_read(pdf_render_page(here::here("output","Base_RI.pdf"), page = 1, dpi = dpi))
+# Repeat for all five maps
+
+# Convert magick images to grobs for grid.arrange()
+g1 <- rasterGrob(img1)
+g2 <- rasterGrob(img2)
+g3 <- rasterGrob(img3)
+g4 <- rasterGrob(img4)
+g5 <- rasterGrob(img5)
+# etc.
+
+# Arrange and save
+pdf(here::here("output", "Base_maps.pdf"), width = 12, height = 10)
+grid.arrange(g1, g2, g3, g4, g5, ncol = 3)
+dev.off()
+```
+
+

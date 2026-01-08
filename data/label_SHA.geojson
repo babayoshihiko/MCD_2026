@@ -1,0 +1,26 @@
+{
+"type": "FeatureCollection",
+"name": "label",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::6668" } },
+"features": [
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Soya" }, "geometry": { "type": "Point", "coordinates": [ 142.698789343621513, 45.377638985424142 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Rumoi" }, "geometry": { "type": "Point", "coordinates": [ 140.880096065234937, 44.657920428444896 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "N. Sorachi" }, "geometry": { "type": "Point", "coordinates": [ 142.952123204631874, 43.945751944930898 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "S. Sorachi" }, "geometry": { "type": "Point", "coordinates": [ 141.79496229693774, 42.212433043262287 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Furano" }, "geometry": { "type": "Point", "coordinates": [ 143.414732863868153, 43.295895518860888 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "N. Oshima, Hiyama" }, "geometry": { "type": "Point", "coordinates": [ 138.24892500239639, 42.491835873045446 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "S. Oshima" }, "geometry": { "type": "Point", "coordinates": [ 138.985570943857482, 41.689467959475159 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "N. Noto" }, "geometry": { "type": "Point", "coordinates": [ 136.046021863175952, 37.281969948789261 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Okuetsu" }, "geometry": { "type": "Point", "coordinates": [ 135.838802919262378, 36.639099524939795 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Tannan" }, "geometry": { "type": "Point", "coordinates": [ 135.333766075808853, 36.095213693528294 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Tokyo Remote Islands" }, "geometry": { "type": "Point", "coordinates": [ 137.956072762971445, 32.793049717101319 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Kyonan" }, "geometry": { "type": "Point", "coordinates": [ 138.217651715376832, 36.012908436020304 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "N. E. Mikawa" }, "geometry": { "type": "Point", "coordinates": [ 137.691790854228174, 34.339907495555082 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Nanwa" }, "geometry": { "type": "Point", "coordinates": [ 135.702795883694392, 33.255001147991187 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Towa" }, "geometry": { "type": "Point", "coordinates": [ 135.109631042713346, 34.506533800196195 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "E. Saga" }, "geometry": { "type": "Point", "coordinates": [ 129.927792050917191, 32.991545491607752 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Saito Koyu" }, "geometry": { "type": "Point", "coordinates": [ 132.478365460898459, 32.132616921815924 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Kosei" }, "geometry": { "type": "Point", "coordinates": [ 135.061823160103103, 35.123988994579179 ] } },
+{ "type": "Feature", "properties": { "id": "99", "SHA_name": "Tokyo Remote Islands" }, "geometry": { "type": "Point", "coordinates": [ 140.628060392754378, 28.161950952416916 ] } }
+]
+}

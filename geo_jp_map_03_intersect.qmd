@@ -1,0 +1,119 @@
+---
+title: "Intersects"
+---
+
+## Prerequisites
+
+```{r include=FALSE}
+library(here)
+library(dplyr)
+library(sf)
+library(crosstable)
+```
+
+## Read Data
+
+```{r include=FALSE}
+sf::sf_use_s2(FALSE)
+
+MCD <- sf::read_sf(here::here("data","MCD.csv"), 
+        options = c("X_POSSIBLE_NAMES=X", "Y_POSSIBLE_NAMES=Y"), 
+        crs = 6668)
+MCD$Type <- ifelse(MCD$Type == 2, 1, MCD$Type)
+MCD$Type <- factor(MCD$Type, levels = c(1,3,4), labels=c("Tertiary","Secondary","Affiliated"))
+
+# Municipality
+N03_small <- sf::read_sf(here::here("data","N03_small.geojson"))
+N03_okinawa_amami <- sf::read_sf(here::here("data","N03_okinawa_amami.geojson"))
+N03 <- rbind(N03_small, N03_okinawa_amami)
+
+# Snowfall
+A22 <- sf::read_sf(here::here("data","A22_small.geojson"))
+A22$Snowfall <- factor(A22$A22_009,
+                        levels = c("1","2"),
+                        labels = c("Heavy","Extemely heavy"))
+
+# Mountainous
+A24 <- sf::read_sf(here::here("data","A24_small.geojson"))
+A24$Mountainous <- "Mountainous"
+
+# Agricultural
+A25 <- sf::read_sf(here::here("data","A25_small.geojson"))
+A25_okinawa_amami <- sf::read_sf(here::here("data","A25_okinawa_amami.geojson"))
+A25 <- rbind(A25, A25_okinawa_amami)
+A25$Agricultural <- "Agricultural"
+
+# Peninsula
+A18 <- sf::read_sf(here::here("data","A18_small.geojson"))
+A18$Peninsula <- "Peninsula"
+
+
+# Remote islands
+dfRI <- sf::read_sf(here::here("data","rito.csv"))
+```
+
+## Intersects
+
+```{r}
+MCD_new <- st_join(
+  MCD, N03 %>% select(N03_007),
+  join = st_intersects,
+  left = TRUE
+)
+MCD_new <- MCD_new %>%
+  mutate(N03_007 = ifelse(is.na(N03_007), "None", as.character(N03_007)))
+```
+
+```{r}
+MCD_new <- MCD_new %>% select(-Snowfall)
+
+MCD_new <- st_join(
+  MCD_new, A22 %>% select(Snowfall),
+  join = st_intersects,
+  left = TRUE
+)
+MCD_new <- MCD_new %>%
+  mutate(Snowfall = ifelse(is.na(Snowfall), "None", as.character(Snowfall)))
+
+
+MCD_new <- MCD_new %>% select(-Mountainous)
+MCD_new <- st_join(
+  MCD_new, A24 %>% select(Mountainous),
+  join = st_intersects,
+  left = TRUE
+)
+MCD_new <- MCD_new %>%
+  mutate(Mountainous = ifelse(is.na(Mountainous), "None", as.character(Mountainous)))
+
+MCD_new <- MCD_new %>% select(-Agricultural)
+MCD_new <- st_join(
+  MCD_new, A25 %>% select(Agricultural),
+  join = st_intersects,
+  left = TRUE
+)
+MCD_new <- MCD_new %>%
+  mutate(Agricultural = ifelse(is.na(Agricultural), "None", as.character(Agricultural)))
+
+MCD_new <- MCD_new %>% select(-Peninsula)
+MCD_new <- st_join(
+  MCD_new, A18 %>% select(Peninsula),
+  join = st_intersects,
+  left = TRUE
+)
+MCD_new <- MCD_new %>%
+  mutate(Peninsula = ifelse(is.na(Peninsula), "None", as.character(Peninsula)))
+
+MCD_new <- MCD_new %>% select(-RI)
+MCD_new <- MCD_new %>%
+  mutate(RI = ifelse(N03_007 %in% dfRI$code_pref_muni, "RI", "None"))
+```
+
+## Table
+
+```{r echo=FALSE, warning=FALSE}
+library(crosstable)
+varsForDescription <- c("Snowfall", "Agricultural", "Mountainous", "Peninsula", "RI")
+crosstable(MCD_new, cols=any_of(varsForDescription), 
+           by=Type, test=FALSE) %>% 
+   as_flextable()
+```

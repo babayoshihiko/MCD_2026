@@ -1,0 +1,25 @@
+{
+"type": "FeatureCollection",
+"name": "label",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::6668" } },
+"features": [
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Soya" }, "geometry": { "type": "Point", "coordinates": [ 142.480839528221594, 45.383478978417827 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Rumoi" }, "geometry": { "type": "Point", "coordinates": [ 140.557056336255869, 44.604790630198046 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "N. Sorachi" }, "geometry": { "type": "Point", "coordinates": [ 142.699050919907648, 44.173609902320088 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "S. Sorachi" }, "geometry": { "type": "Point", "coordinates": [ 141.79496229693774, 42.212433043262287 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Furano" }, "geometry": { "type": "Point", "coordinates": [ 143.352776539593577, 43.158248833446194 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "N. Oshima, Hiyama" }, "geometry": { "type": "Point", "coordinates": [ 139.068787372290018, 43.14433977770819 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "S. Oshima" }, "geometry": { "type": "Point", "coordinates": [ 138.901878703434022, 41.711707036694335 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "N. Noto" }, "geometry": { "type": "Point", "coordinates": [ 137.012297768173767, 37.319523683731823 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Okuetsu" }, "geometry": { "type": "Point", "coordinates": [ 136.591193652864661, 35.967131621104549 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Tannan" }, "geometry": { "type": "Point", "coordinates": [ 136.194384005746485, 35.853757436213641 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Tokyo Remote Islands" }, "geometry": { "type": "Point", "coordinates": [ 140.851325026223776, 33.613407163109024 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Kyonan" }, "geometry": { "type": "Point", "coordinates": [ 138.971423982124065, 35.814267403782935 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "N. E. Mikawa" }, "geometry": { "type": "Point", "coordinates": [ 137.59577065185178, 35.080577373702262 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Nanwa" }, "geometry": { "type": "Point", "coordinates": [ 135.863146396218355, 34.215338742946024 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Towa" }, "geometry": { "type": "Point", "coordinates": [ 135.919046699582907, 34.523635302761363 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "E. Saga" }, "geometry": { "type": "Point", "coordinates": [ 129.819265306520975, 34.061726380795108 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Saito Koyu" }, "geometry": { "type": "Point", "coordinates": [ 132.016896113124773, 31.947549908619319 ] } },
+{ "type": "Feature", "properties": { "id": null, "SHA_name": "Kosei" }, "geometry": { "type": "Point", "coordinates": [ 135.943341167773752, 35.375966228459092 ] } }
+]
+}

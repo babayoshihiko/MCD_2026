@@ -1,0 +1,819 @@
+---
+title: "Simplify polygons"
+---
+
+## Prerequisites
+
+Please create a text file .Renviron in your home (C:\Users\username on Windows) and write:
+
+GIS_DATA=C://path//to//data
+
+Install geojp:
+
+```{r eval=FALSE}
+install.packages("devtools")
+devtools::install_github("babayoshihiko/geojp")
+```
+
+```{r include=FALSE}
+library(here)
+library(dplyr)
+library(geojp)
+library(sf)
+
+Sys.setenv(RMAPSHAPER = "--max-old-space-size=4096")
+library(rmapshaper)
+
+data_dir <- Sys.getenv("GIS_DATA")  # Fetch from ~/.Renviron
+```
+
+## Functions
+
+### remove_small_polygons()
+
+```{r include=FALSE}
+library(sf)
+library(dplyr)
+
+remove_small_polygons <- function(sf_obj, area_threshold = 1000) {
+  # Ensure valid geometry
+  sf_obj <- sf::st_make_valid(sf_obj)
+  
+  # Add an ID for grouping later
+  sf_obj$id <- seq_len(nrow(sf_obj))
+
+  # Explode to individual polygons
+  polys <- sf::st_cast(sf_obj, "POLYGON")
+
+  # Calculate area and convert to numeric (assuming projected CRS)
+  polys$area <- as.numeric(sf::st_area(polys))
+
+  # Filter out small polygons
+  polys_filtered <- polys %>% dplyr::filter(area >= area_threshold)
+  polys_filtered <- subset(polys_filtered, select = -area)
+
+  # Group back by original feature ID and attributes
+  result <- polys_filtered %>%
+    dplyr::group_by(id) %>%
+    dplyr::summarise(across(-geometry, first), geometry = st_union(geometry), .groups = "drop") %>%
+    sf::st_cast("MULTIPOLYGON")
+
+  # Drop temporary 'id' column
+  result$id <- NULL
+
+  return(result)
+}
+```
+
+### simplify_polygon()
+
+```{r include=FALSE}
+simplify_polygon <- function(polygons, 
+                             col_index,
+                             col_class = NA) {
+
+  if (!(col_index %in% colnames(polygons))) {
+    stop(paste("Column", col_index, "not found in the sf object."))
+  }
+
+  # Collect grouping attributes
+  col_selection <- col_index
+  if (!is.na(col_class) && col_class %in% colnames(polygons)) {
+    col_selection <- c(col_index, col_class)
+  }
+
+  # Keep only necessary columns + geometry
+  polygons <- polygons[, c(col_selection, attr(polygons, "sf_column"))]
+
+  # Clean and sort
+  polygons[[col_index]] <- as.integer(polygons[[col_index]])
+  polygons <- polygons[order(polygons[[col_index]]), ]
+  polygons <- sf::st_make_valid(polygons)
+  polygons$geometry <- sf::st_cast(polygons$geometry, "MULTIPOLYGON")
+
+  # Simplify
+  message("Simplifying geometry...")
+  polygons_sim <- rmapshaper::ms_simplify(
+    polygons,
+    keep = 0.01,
+    keep_shapes = TRUE
+  )
+
+  # Remove small slivers
+  polygons_rem <- remove_small_polygons(polygons_sim, area_threshold = 5000)
+
+  return(polygons_rem)
+}
+
+```
+
+### dissolve_sf_by_column()
+
+```{r include=FALSE}
+library(sf)
+
+dissolve_sf_by_column <- function(sf_obj, 
+                                  col_index,
+                                  col_class = NA) {
+  # Check sf input
+  if (!inherits(sf_obj, "sf")) {
+    stop("Input must be an sf object.")
+  }
+
+  # Check column existence
+  if (!(col_index %in% names(sf_obj))) {
+    stop(paste("Column", col_index, "not found in sf object."))
+  }
+
+  message("Running dissolve...")
+
+  # Build column selection
+  col_selection <- col_index
+
+  if (!is.na(col_class)) {
+    if (col_class %in% names(sf_obj)) {
+      col_selection <- c(col_index, col_class)
+    } else {
+      stop(paste("Column", col_class, "not found in sf object."))
+    }
+  } else {
+    message("No additional attributes are copied.")
+  }
+
+  # Drop geometry and extract attributes
+  attr_data <- sf::st_drop_geometry(sf_obj)[, col_selection, drop = FALSE]
+
+  # Check list columns
+  if (any(sapply(attr_data, is.list))) {
+    stop("One or more selected columns are lists. Please use only atomic vector columns.")
+  }
+
+  # Perform dissolve
+  dissolved <- aggregate(
+    sf_obj["geometry"],
+    by = attr_data,
+    FUN = sf::st_union
+  )
+
+  # Rename first grouping column back
+  names(dissolved)[1] <- col_index
+
+  return(dissolved)
+}
+
+```
+
+### dissolve_ordcity
+
+```{r}
+library(sf)
+library(dplyr)
+
+dissolve_ordcity <- function(sf_obj, target_codes, new_code) {
+  
+  # Extract target and non-target features
+  target_sf <- sf_obj %>% filter(N03_007 %in% target_codes)
+  other_sf  <- sf_obj %>% filter(!N03_007 %in% target_codes)
+  
+  # Perform full topology dissolve → single polygon
+  dissolved_geom <- st_union(target_sf)
+  
+  # Create new sf object (avoid sticky geometry)
+  dissolved_sf <- st_sf(
+    N03_007 = new_code,
+    geometry = st_sfc(dissolved_geom, crs = st_crs(sf_obj))
+  )
+  
+  # Combine back
+  result <- rbind(other_sf, dissolved_sf)
+  
+  return(result)
+}
+```
+
+## Remove too far islands
+
+```{r}
+library(sf)
+
+remove_features_in_bbox <- function(sf_obj, bbox) {
+  # bbox = c(xmin, ymin, xmax, ymax)
+  if (!inherits(sf_obj, "sf")) {
+    stop("Input must be an sf object.")
+  }
+  
+  if (length(bbox) != 4) {
+    stop("Bounding box must be c(xmin, ymin, xmax, ymax).")
+  }
+  
+  # Construct bbox polygon
+  bbox_poly <- st_as_sfc(
+    st_bbox(c(xmin = bbox[1],
+              ymin = bbox[2],
+              xmax = bbox[3],
+              ymax = bbox[4]),
+            crs = st_crs(sf_obj))
+  )
+  
+  # Identify features *intersecting* the bbox
+  inside <- st_intersects(sf_obj, bbox_poly, sparse = FALSE)
+  
+  # Keep features OUTSIDE the bbox
+  sf_obj[!inside, ]
+}
+
+```
+
+## Data Preparation
+
+### N03 municipality
+
+```{r include=FALSE}
+polygons_01 <- geojp::read_landnuminfo_admin(1, data_dir = data_dir)
+polygons_01 <- simplify_polygon(polygons_01, "N03_007")
+polygons_01 <- dissolve_sf_by_column(polygons_01, "N03_007")
+polygons_01 <- dissolve_ordcity(polygons_01, 1101:1110, "1100")
+
+
+polygons_honsyu <- geojp::read_landnuminfo_admin(2, data_dir = data_dir)
+for (i in 3:35){
+  polygons_temp <- geojp::read_landnuminfo_admin(i, data_dir = data_dir)
+  if (i == 13){
+    bbox_tokyo_islands <- c(136.066, 20.416, 136.089, 20.449)
+    polygons_temp <- remove_features_in_bbox(polygons_temp, bbox_tokyo_islands)
+    bbox_tokyo_islands <- c(140.957, 24.032, 141.66, 25.729)
+    polygons_temp <- remove_features_in_bbox(polygons_temp, bbox_tokyo_islands)
+    bbox_tokyo_islands <- c(153.955, 24.262, 154.009, 24.314)
+    polygons_temp <- remove_features_in_bbox(polygons_temp, bbox_tokyo_islands)
+  }
+  polygons_honsyu <- rbind(polygons_honsyu, polygons_temp)
+}
+polygons_honsyu <- simplify_polygon(polygons_honsyu, "N03_007")
+polygons_honsyu <- dissolve_sf_by_column(polygons_honsyu, "N03_007")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 4101:4105, "4100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 11101:11110, "11100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 12101:12106, "12100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 14101:14118, "14100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 14131:14137, "14130")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 15101:15108, "15100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 22101:22103, "22100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 22131:22140, "22130")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 23101:23116, "23100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 26101:26111, "26100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 27101:27128, "27100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 27141:27147, "27140")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 28101:28111, "28100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 33101:33110, "33100")
+polygons_honsyu <- dissolve_ordcity(polygons_honsyu, 34101:34110, "34100")
+polygons_tosho_izu <- dplyr::filter(polygons_honsyu, 
+                      N03_007 == 13361 |
+                      N03_007 == 13362 |
+                      N03_007 == 13363 |
+                      N03_007 == 13364 |
+                      N03_007 == 13381 |
+                      N03_007 == 13382 |
+                      N03_007 == 13401 |
+                      N03_007 == 13402 )
+polygons_tosho_oga <- dplyr::filter(polygons_honsyu, 
+                      N03_007 == 13421 )
+polygons_honsyu_nori <- dplyr::filter(polygons_honsyu, 
+                      N03_007 != 13421 )
+bbox_tokyo_islands <- c(140.50, 26.35, 142.66, 28.38)
+polygons_honsyu_nori <- remove_features_in_bbox(polygons_honsyu_nori, bbox_tokyo_islands)
+
+polygons_shikoku <- geojp::read_landnuminfo_admin(36, data_dir = data_dir)
+for (i in 37:39){
+  polygons_temp <- geojp::read_landnuminfo_admin(i, data_dir = data_dir)
+  polygons_shikoku <- rbind(polygons_shikoku, polygons_temp)
+}
+polygons_shikoku <- simplify_polygon(polygons_shikoku, "N03_007")
+polygons_shikoku <- dissolve_sf_by_column(polygons_shikoku, "N03_007")
+
+polygons_kyushu <- geojp::read_landnuminfo_admin(40, data_dir = data_dir)
+for (i in 41:46){
+  polygons_temp <- geojp::read_landnuminfo_admin(i, data_dir = data_dir)
+  polygons_kyushu <- rbind(polygons_kyushu, polygons_temp)
+}
+polygons_kyushu <- simplify_polygon(polygons_kyushu, "N03_007")
+polygons_kyushu <- dissolve_sf_by_column(polygons_kyushu, "N03_007")
+polygons_kyushu <- dissolve_ordcity(polygons_kyushu, 40101:40110, "40100")
+polygons_kyushu <- dissolve_ordcity(polygons_kyushu, 40131:40137, "40130")
+polygons_kyushu <- dissolve_ordcity(polygons_kyushu, 43101:43110, "43100")
+
+polygons_kyushu_nori <- dplyr::filter(polygons_kyushu, 
+                      N03_007 != 46222 &
+                      N03_007 != 46304 &
+                      N03_007 != 46523 &
+                      N03_007 != 46524 &
+                      N03_007 != 46525 &
+                      N03_007 != 46527 &
+                      N03_007 != 46529 &
+                      N03_007 != 46530 &
+                      N03_007 != 46531 &
+                      N03_007 != 46532 &
+                      N03_007 != 46533 &
+                      N03_007 != 46534 &
+                      N03_007 != 46535 )
+
+polygons_47 <- geojp::read_landnuminfo_admin(47, data_dir = data_dir )
+polygons_47 <- simplify_polygon(polygons_47, "N03_007")
+polygons_47 <- dissolve_sf_by_column(polygons_47, "N03_007")
+polygons_temp <- simplify_polygon(polygons_temp, "N03_007")
+polygons_temp <- dissolve_sf_by_column(polygons_temp, "N03_007")
+polygons_temp <- dplyr::filter(polygons_temp, 
+                      N03_007 == 46222 |
+                      N03_007 == 46304 |
+                      N03_007 == 46523 |
+                      N03_007 == 46524 |
+                      N03_007 == 46525 |
+                      N03_007 == 46527 |
+                      N03_007 == 46529 |
+                      N03_007 == 46530 |
+                      N03_007 == 46531 |
+                      N03_007 == 46532 |
+                      N03_007 == 46533 |
+                      N03_007 == 46534 |
+                      N03_007 == 46535 )
+polygons_okinawa_amami <- rbind(polygons_temp, polygons_47) 
+
+polygons_small <- rbind(polygons_01, polygons_honsyu, polygons_shikoku, polygons_kyushu_nori)
+polygons_small_nori <- rbind(polygons_01, polygons_honsyu_nori, polygons_shikoku, polygons_kyushu_nori) 
+polygons_small <- dplyr::filter(polygons_small, 
+                      N03_007 != "1695" &
+                      N03_007 != "1696" &
+                      N03_007 != "1697" &
+                      N03_007 != "1698" &
+                      N03_007 != "1699" &
+                      N03_007 != "1700" &
+                      N03_007 != "12000" &
+                      N03_007 != "12801" &
+                      N03_007 != "13000" &
+                      N03_007 != "13801" &
+                      N03_007 != "13803" &
+                      N03_007 != "13805" &
+                      N03_007 != "13807" &
+                      N03_007 != "23000" &
+                      N03_007 != "23801" &
+                      N03_007 != "30000" &
+                      N03_007 != "40000" &
+                      N03_007 != "46000" &
+                      N03_007 != "46801" &
+                      N03_007 != "47801")
+polygons_small_nori <- dplyr::filter(polygons_small_nori, 
+                      N03_007 != "1695" &
+                      N03_007 != "1696" &
+                      N03_007 != "1697" &
+                      N03_007 != "1698" &
+                      N03_007 != "1699" &
+                      N03_007 != "1700" &
+                      N03_007 != "12000" &
+                      N03_007 != "12801" &
+                      N03_007 != "13000" &
+                      N03_007 != "13801" &
+                      N03_007 != "13803" &
+                      N03_007 != "13805" &
+                      N03_007 != "13807" &
+                      N03_007 != "23000" &
+                      N03_007 != "23801" &
+                      N03_007 != "30000" &
+                      N03_007 != "40000" &
+                      N03_007 != "46000" &
+                      N03_007 != "46801" &
+                      N03_007 != "47801")
+```
+
+```{r}
+polygons_small$N03_007 <- as.character(polygons_small$N03_007)
+polygons_small_nori$N03_007 <- as.character(polygons_small_nori$N03_007)
+polygons_okinawa_amami$N03_007 <- as.character(polygons_okinawa_amami$N03_007)
+sf::st_write(polygons_small, here::here("data","N03_small.geojson"), delete_dsn = TRUE)
+sf::st_write(polygons_small_nori, here::here("data","N03_small_nori.geojson"), delete_dsn = TRUE)
+sf::st_write(polygons_okinawa_amami, here::here("data","N03_okinawa_amami.geojson"), delete_dsn = TRUE)
+N03 <- rbind(polygons_small, polygons_okinawa_amami)
+sf::st_write(N03, here::here("data","N03.geojson"), delete_dsn = TRUE)
+```
+
+### Secondary Healthcare
+
+```{r include=FALSE}
+polygons_01 <- geojp::read_landnuminfo_second_medical_area(1, data_dir = data_dir)
+polygons_01 <- simplify_polygon(polygons_01, "A38b_003")
+polygons_01 <- dissolve_sf_by_column(polygons_01, "A38b_003")
+
+polygons_honsyu <- geojp::read_landnuminfo_second_medical_area(2, data_dir = data_dir)
+for (i in 3:35){
+  polygons_temp <- geojp::read_landnuminfo_second_medical_area(i, data_dir = data_dir)
+  if (i == 13){
+    bbox_tokyo_islands <- c(136.066, 20.416, 136.089, 20.449)
+    polygons_temp <- remove_features_in_bbox(polygons_temp, bbox_tokyo_islands)
+    bbox_tokyo_islands <- c(140.957, 24.032, 141.66, 25.729)
+    polygons_temp <- remove_features_in_bbox(polygons_temp, bbox_tokyo_islands)
+    bbox_tokyo_islands <- c(153.955, 24.262, 154.009, 24.314)
+    polygons_temp <- remove_features_in_bbox(polygons_temp, bbox_tokyo_islands)
+  }
+  polygons_honsyu <- rbind(polygons_honsyu, polygons_temp)
+}
+polygons_honsyu <- simplify_polygon(polygons_honsyu, "A38b_003")
+polygons_honsyu <- dissolve_sf_by_column(polygons_honsyu, "A38b_003")
+# Removing remote islands
+polygons_tosho <- dplyr::filter(polygons_honsyu, 
+                      A38b_003 == 1313)
+# polygons_honsyu_nori <- dplyr::filter(polygons_honsyu, 
+#                       A38b_003 != 1313 )
+bbox_tokyo_islands <- c(140.50, 26.35, 142.66, 28.38)
+polygons_honsyu_nori <- remove_features_in_bbox(polygons_honsyu, bbox_tokyo_islands)
+
+polygons_shikoku <- geojp::read_landnuminfo_second_medical_area(36, data_dir = data_dir)
+for (i in 37:39){
+  polygons_temp <- geojp::read_landnuminfo_second_medical_area(i, data_dir = data_dir)
+  polygons_shikoku <- rbind(polygons_shikoku, polygons_temp)
+}
+polygons_shikoku <- simplify_polygon(polygons_shikoku, "A38b_003")
+polygons_shikoku <- dissolve_sf_by_column(polygons_shikoku, "A38b_003")
+
+polygons_kyushu <- geojp::read_landnuminfo_second_medical_area(40, data_dir = data_dir)
+for (i in 41:46){
+  polygons_temp <- geojp::read_landnuminfo_second_medical_area(i, data_dir = data_dir)
+  polygons_kyushu <- rbind(polygons_kyushu, polygons_temp)
+}
+polygons_kyushu <- simplify_polygon(polygons_kyushu, "A38b_003")
+polygons_kyushu <- dissolve_sf_by_column(polygons_kyushu, "A38b_003")
+polygons_kyushu_nori <- dplyr::filter(polygons_kyushu, 
+                      A38b_003 != 4611 &
+                      A38b_003 != 4612 )
+
+polygons_47 <- geojp::read_landnuminfo_second_medical_area(47, data_dir = data_dir )
+polygons_47 <- simplify_polygon(polygons_47, "A38b_003")
+polygons_47 <- dissolve_sf_by_column(polygons_47, "A38b_003")
+polygons_temp <- simplify_polygon(polygons_temp, "A38b_003")
+polygons_temp <- dissolve_sf_by_column(polygons_temp, "A38b_003")
+polygons_temp <- dplyr::filter(polygons_temp, 
+                      A38b_003 == 4611 |
+                      A38b_003 == 4612 )
+polygons_okinawa_amami <- rbind(polygons_temp, polygons_47) 
+
+
+polygons_small <- rbind(polygons_01, polygons_honsyu, polygons_shikoku, polygons_kyushu_nori)
+polygons_small_nori <- rbind(polygons_01, polygons_honsyu_nori, polygons_shikoku, polygons_kyushu_nori) 
+
+```
+
+```{r}
+sf::st_write(polygons_small, here::here("data", "A38_small.geojson"), delete_dsn = TRUE)
+sf::st_write(polygons_small_nori, here::here("data", "A38_small_nori.geojson"), delete_dsn = TRUE)
+sf::st_write(polygons_okinawa_amami, here::here("data", "A38_okinawa_amami.geojson"), delete_dsn = TRUE)
+```
+
+### Snowfall
+
+```{r include=FALSE}
+polygons_01 <- geojp::read_landnuminfo_heavy_snowfall(1, data_dir = data_dir)
+polygons_01 <- simplify_polygon(polygons_01, "A22_002", "A22_009")
+polygons_01 <- dissolve_sf_by_column(polygons_01, "A22_002", "A22_009")
+
+polygons_honsyu <- geojp::read_landnuminfo_heavy_snowfall(2, data_dir = data_dir)
+for (i in c(3,4,5,6,7,9,10,15,16,17,18,19,20,21,22,25,26,28,31,32,33,34)){
+  polygons_temp <- geojp::read_landnuminfo_heavy_snowfall(i, data_dir = data_dir)
+  polygons_honsyu <- rbind(polygons_honsyu, polygons_temp)
+}
+polygons_honsyu <- simplify_polygon(polygons_honsyu, "A22_002", "A22_009")
+polygons_honsyu <- dissolve_sf_by_column(polygons_honsyu, "A22_002", "A22_009")
+polygons_tosho_izu <- dplyr::filter(polygons_honsyu, 
+                      A22_002 == 13361 |
+                      A22_002 == 13362 |
+                      A22_002 == 13363 |
+                      A22_002 == 13364 |
+                      A22_002 == 13381 |
+                      A22_002 == 13382 |
+                      A22_002 == 13401 |
+                      A22_002 == 13402 )
+polygons_tosho_oga <- dplyr::filter(polygons_honsyu, 
+                      A22_002 == 13421 )
+polygons_honsyu_nori <- dplyr::filter(polygons_honsyu, 
+                      A22_002 != 13421 )
+
+
+polygons_small <- rbind(polygons_01, polygons_honsyu_nori) 
+polygons_small <- dplyr::filter(polygons_small, 
+                      A22_002 != "1695" &
+                      A22_002 != "1696" &
+                      A22_002 != "1697" &
+                      A22_002 != "1698" &
+                      A22_002 != "1699" &
+                      A22_002 != "1700" &
+                      A22_002 != "12000" &
+                      A22_002 != "12801" &
+                      A22_002 != "13000" &
+                      A22_002 != "13801" &
+                      A22_002 != "13803" &
+                      A22_002 != "13805" &
+                      A22_002 != "13807" &
+                      A22_002 != "23000" &
+                      A22_002 != "23801" &
+                      A22_002 != "30000" &
+                      A22_002 != "40000" &
+                      A22_002 != "46000" &
+                      A22_002 != "46801" &
+                      A22_002 != "47801")
+```
+
+```{r}
+sf::st_write(polygons_small, here::here("data", "A22_small.geojson"), delete_dsn = TRUE)
+```
+
+### Mountainous
+
+```{r include=FALSE}
+polygons_01 <- geojp::read_landnuminfo_development_mountain_village(1, data_dir = data_dir)
+polygons_01 <- simplify_polygon(polygons_01, "A24_002")
+polygons_01 <- dissolve_sf_by_column(polygons_01, "A24_002")
+
+polygons_honsyu <- geojp::read_landnuminfo_development_mountain_village(2, data_dir = data_dir)
+for (i in 3:35){
+  if (i != 27){
+  polygons_temp <- geojp::read_landnuminfo_development_mountain_village(i, data_dir = data_dir)
+  polygons_honsyu <- rbind(polygons_honsyu, polygons_temp)
+  }
+}
+polygons_honsyu <- simplify_polygon(polygons_honsyu, "A24_002")
+polygons_honsyu <- dissolve_sf_by_column(polygons_honsyu, "A24_002")
+polygons_tosho_izu <- dplyr::filter(polygons_honsyu, 
+                      A24_002 == 13361 |
+                      A24_002 == 13362 |
+                      A24_002 == 13363 |
+                      A24_002 == 13364 |
+                      A24_002 == 13381 |
+                      A24_002 == 13382 |
+                      A24_002 == 13401 |
+                      A24_002 == 13402 )
+polygons_tosho_oga <- dplyr::filter(polygons_honsyu, 
+                      A24_002 == 13421 )
+polygons_honsyu_nori <- dplyr::filter(polygons_honsyu, 
+                      A24_002 != 13421 )
+
+polygons_shikoku <- geojp::read_landnuminfo_development_mountain_village(36, data_dir = data_dir)
+for (i in 37:39){
+  polygons_temp <- geojp::read_landnuminfo_development_mountain_village(i, data_dir = data_dir)
+  polygons_shikoku <- rbind(polygons_shikoku, polygons_temp)
+}
+polygons_shikoku <- simplify_polygon(polygons_shikoku, "A24_002")
+polygons_shikoku <- dissolve_sf_by_column(polygons_shikoku, "A24_002")
+
+polygons_kyushu <- geojp::read_landnuminfo_development_mountain_village(40, data_dir = data_dir)
+for (i in 41:46){
+  if (i != 42){
+  polygons_temp <- geojp::read_landnuminfo_development_mountain_village(i, data_dir = data_dir)
+  polygons_kyushu <- rbind(polygons_kyushu, polygons_temp)
+  }
+}
+polygons_kyushu <- simplify_polygon(polygons_kyushu, "A24_002")
+polygons_kyushu <- dissolve_sf_by_column(polygons_kyushu, "A24_002")
+polygons_kyushu_nori <- dplyr::filter(polygons_kyushu, 
+                      A24_002 != 46222 &
+                      A24_002 != 46304 &
+                      A24_002 != 46523 &
+                      A24_002 != 46524 &
+                      A24_002 != 46525 &
+                      A24_002 != 46527 &
+                      A24_002 != 46529 &
+                      A24_002 != 46530 &
+                      A24_002 != 46531 &
+                      A24_002 != 46532 &
+                      A24_002 != 46533 &
+                      A24_002 != 46534 &
+                      A24_002 != 46535 )
+
+
+polygons_temp <- simplify_polygon(polygons_temp, "A24_002")
+polygons_temp <- dissolve_sf_by_column(polygons_temp, "A24_002")
+polygons_temp <- dplyr::filter(polygons_temp, 
+                      A24_002 == 46222 |
+                      A24_002 == 46304 |
+                      A24_002 == 46523 |
+                      A24_002 == 46524 |
+                      A24_002 == 46525 |
+                      A24_002 == 46527 |
+                      A24_002 == 46529 |
+                      A24_002 == 46530 |
+                      A24_002 == 46531 |
+                      A24_002 == 46532 |
+                      A24_002 == 46533 |
+                      A24_002 == 46534 |
+                      A24_002 == 46535 )
+polygons_okinawa_amami <- rbind(polygons_temp) 
+
+polygons_small <- rbind(polygons_01, polygons_honsyu_nori, polygons_shikoku, polygons_kyushu_nori) 
+polygons_small <- dplyr::filter(polygons_small, 
+                      A24_002 != "1695" &
+                      A24_002 != "1696" &
+                      A24_002 != "1697" &
+                      A24_002 != "1698" &
+                      A24_002 != "1699" &
+                      A24_002 != "1700" &
+                      A24_002 != "12000" &
+                      A24_002 != "12801" &
+                      A24_002 != "13000" &
+                      A24_002 != "13801" &
+                      A24_002 != "13803" &
+                      A24_002 != "13805" &
+                      A24_002 != "13807" &
+                      A24_002 != "23000" &
+                      A24_002 != "23801" &
+                      A24_002 != "30000" &
+                      A24_002 != "40000" &
+                      A24_002 != "46000" &
+                      A24_002 != "46801" &
+                      A24_002 != "47801")
+```
+
+```{r}
+sf::st_write(polygons_small, here::here("data", "A24_small.geojson"), delete_dsn = TRUE)
+```
+
+### Agricultural
+
+```{r include=FALSE}
+polygons_01 <- geojp::read_landnuminfo_designated_rural(1, data_dir = data_dir)
+polygons_01 <- simplify_polygon(polygons_01, "A25_002")
+polygons_01 <- dissolve_sf_by_column(polygons_01, "A25_002")
+
+polygons_honsyu <- geojp::read_landnuminfo_designated_rural(2, data_dir = data_dir)
+for (i in 3:35){
+  polygons_temp <- geojp::read_landnuminfo_designated_rural(i, data_dir = data_dir)
+  polygons_honsyu <- rbind(polygons_honsyu, polygons_temp)
+}
+polygons_honsyu <- simplify_polygon(polygons_honsyu, "A25_002")
+polygons_honsyu <- dissolve_sf_by_column(polygons_honsyu, "A25_002")
+polygons_tosho_izu <- dplyr::filter(polygons_honsyu, 
+                      A25_002 == 13361 |
+                      A25_002 == 13362 |
+                      A25_002 == 13363 |
+                      A25_002 == 13364 |
+                      A25_002 == 13381 |
+                      A25_002 == 13382 |
+                      A25_002 == 13401 |
+                      A25_002 == 13402 )
+polygons_tosho_oga <- dplyr::filter(polygons_honsyu, 
+                      A25_002 == 13421 )
+polygons_honsyu_nori <- dplyr::filter(polygons_honsyu, 
+                      A25_002 != 13421 )
+
+polygons_shikoku <- geojp::read_landnuminfo_designated_rural(36, data_dir = data_dir)
+for (i in 37:39){
+  polygons_temp <- geojp::read_landnuminfo_designated_rural(i, data_dir = data_dir)
+  polygons_shikoku <- rbind(polygons_shikoku, polygons_temp)
+}
+polygons_shikoku <- simplify_polygon(polygons_shikoku, "A25_002")
+polygons_shikoku <- dissolve_sf_by_column(polygons_shikoku, "A25_002")
+
+polygons_kyushu <- geojp::read_landnuminfo_designated_rural(40, data_dir = data_dir)
+for (i in 41:46){
+  polygons_temp <- geojp::read_landnuminfo_designated_rural(i, data_dir = data_dir)
+  polygons_kyushu <- rbind(polygons_kyushu, polygons_temp)
+}
+polygons_kyushu <- simplify_polygon(polygons_kyushu, "A25_002")
+polygons_kyushu <- dissolve_sf_by_column(polygons_kyushu, "A25_002")
+polygons_kyushu_nori <- dplyr::filter(polygons_kyushu, 
+                      A25_002 != 46222 &
+                      A25_002 != 46304 &
+                      A25_002 != 46523 &
+                      A25_002 != 46524 &
+                      A25_002 != 46525 &
+                      A25_002 != 46527 &
+                      A25_002 != 46529 &
+                      A25_002 != 46530 &
+                      A25_002 != 46531 &
+                      A25_002 != 46532 &
+                      A25_002 != 46533 &
+                      A25_002 != 46534 &
+                      A25_002 != 46535 )
+
+polygons_47 <- geojp::read_landnuminfo_designated_rural(47, data_dir = data_dir )
+polygons_47 <- simplify_polygon(polygons_47, "A25_002")
+polygons_47 <- dissolve_sf_by_column(polygons_47, "A25_002")
+polygons_temp <- simplify_polygon(polygons_temp, "A25_002")
+polygons_temp <- dissolve_sf_by_column(polygons_temp, "A25_002")
+polygons_temp <- dplyr::filter(polygons_temp, 
+                      A25_002 == 46222 |
+                      A25_002 == 46304 |
+                      A25_002 == 46523 |
+                      A25_002 == 46524 |
+                      A25_002 == 46525 |
+                      A25_002 == 46527 |
+                      A25_002 == 46529 |
+                      A25_002 == 46530 |
+                      A25_002 == 46531 |
+                      A25_002 == 46532 |
+                      A25_002 == 46533 |
+                      A25_002 == 46534 |
+                      A25_002 == 46535 )
+polygons_okinawa_amami <- rbind(polygons_temp, polygons_47) 
+
+polygons_small <- rbind(polygons_01, polygons_honsyu_nori, polygons_shikoku, polygons_kyushu_nori) 
+polygons_small <- dplyr::filter(polygons_small, 
+                      A25_002 != "1695" &
+                      A25_002 != "1696" &
+                      A25_002 != "1697" &
+                      A25_002 != "1698" &
+                      A25_002 != "1699" &
+                      A25_002 != "1700" &
+                      A25_002 != "12000" &
+                      A25_002 != "12801" &
+                      A25_002 != "13000" &
+                      A25_002 != "13801" &
+                      A25_002 != "13803" &
+                      A25_002 != "13805" &
+                      A25_002 != "13807" &
+                      A25_002 != "23000" &
+                      A25_002 != "23801" &
+                      A25_002 != "30000" &
+                      A25_002 != "40000" &
+                      A25_002 != "46000" &
+                      A25_002 != "46801" &
+                      A25_002 != "47801")
+```
+
+```{r}
+sf::st_write(polygons_small, here::here("data", "A25_small.geojson"), delete_dsn = TRUE)
+sf::st_write(polygons_okinawa_amami, here::here("data", "/A25_okinawa_amami.geojson"), delete_dsn = TRUE)
+```
+
+### Peninsula
+
+A18
+
+```{r include=FALSE}
+polygons_01 <- geojp::read_landnuminfo_peninsulas_development_implementation(1, data_dir = data_dir)
+polygons_01 <- simplify_polygon(polygons_01, "A18_002")
+polygons_01 <- dissolve_sf_by_column(polygons_01, "A18_002")
+
+polygons_honsyu <- geojp::read_landnuminfo_peninsulas_development_implementation(2, data_dir = data_dir)
+for (i in c(5,12,16,17,22,24,26,29,30,32,34,35)){
+  polygons_temp <- geojp::read_landnuminfo_peninsulas_development_implementation(i, data_dir = data_dir)
+  polygons_honsyu <- rbind(polygons_honsyu, polygons_temp)
+}
+polygons_honsyu <- simplify_polygon(polygons_honsyu, "A18_002")
+polygons_honsyu <- dissolve_sf_by_column(polygons_honsyu, "A18_002")
+
+polygons_shikoku <- geojp::read_landnuminfo_peninsulas_development_implementation(38, data_dir = data_dir)
+polygons_temp <- geojp::read_landnuminfo_peninsulas_development_implementation(39, data_dir = data_dir)
+polygons_shikoku <- rbind(polygons_shikoku, polygons_temp)
+polygons_shikoku <- simplify_polygon(polygons_shikoku, "A18_002")
+polygons_shikoku <- dissolve_sf_by_column(polygons_shikoku, "A18_002")
+
+polygons_kyushu <- geojp::read_landnuminfo_peninsulas_development_implementation(41, data_dir = data_dir)
+for (i in c(42,43,44,45,46)){
+  polygons_temp <- geojp::read_landnuminfo_peninsulas_development_implementation(i, data_dir = data_dir)
+  polygons_kyushu <- rbind(polygons_kyushu, polygons_temp)
+}
+polygons_kyushu <- simplify_polygon(polygons_kyushu, "A18_002")
+polygons_kyushu <- dissolve_sf_by_column(polygons_kyushu, "A18_002")
+
+polygons_small <- rbind(polygons_01, polygons_honsyu, polygons_shikoku, polygons_kyushu) 
+```
+
+```{r}
+sf::st_write(polygons_small, here::here("data", "A18_small.geojson"), delete_dsn = TRUE)
+```
+
+# Intersect
+
+```{r}
+library(sf)
+library(dplyr)
+
+add_intersection_flag <- function(sf1, sf2, fieldname) {
+  
+  # logical vector: TRUE if intersection exists
+  inter <- lengths(st_intersects(sf1, sf2)) > 0
+  
+  # add integer flag column
+  sf1[[fieldname]] <- ifelse(inter, 1, 0)
+  
+  return(sf1)
+}
+```
+
+
+```{r}
+N03 <- sf::read_sf(here::here("data", "N03.geojson"))
+A22 <- sf::read_sf(here::here("data", "A22_small.geojson"))
+N03 <- add_intersection_flag(N03, A22, "Snowfall")
+A24 <- sf::read_sf(here::here("data", "A24_small.geojson"))
+N03 <- add_intersection_flag(N03, A24, "Mountainous")
+A25 <- sf::read_sf(here::here("data", "A25_small.geojson"))
+A25_okinawa_amami <- sf::read_sf(here::here("data", "A25_okinawa_amami.geojson"))
+A25 <- rbind(A25, A25_okinawa_amami)
+N03 <- add_intersection_flag(N03, A25, "Agricultural")
+A18 <- sf::read_sf(here::here("data", "A18_small.geojson"))
+N03 <- add_intersection_flag(N03, A18, "Peninsula")
+A24 <- sf::read_sf(here::here("data", "A24_small.geojson"))
+N03 <- add_intersection_flag(N03, A24, "Mountainous")
+dfRI <- sf::read_sf(here::here("data", "rito.csv"))
+target_codes <- dfRI$code_pref_muni
+N03$RI <- ifelse(N03$N03_007 %in% target_codes, 1, 0)
+```
+
+```{r}
+sf::st_write(N03, here::here("data", "N03_geography.csv", delete_dsn = TRUE)
+```

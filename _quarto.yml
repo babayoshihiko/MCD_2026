@@ -1,0 +1,25 @@
+project:
+  type: website
+  output-dir: docs
+  render:
+    - index.qmd
+    - map.qmd
+    # Any file not listed here will be ignored by the build process
+
+website:
+  title: "MCD_2026"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - map.qmd
+
+format:
+  html:
+    theme:
+      - cosmo
+      - brand
+    css: styles.css
+    toc: true
+
+
