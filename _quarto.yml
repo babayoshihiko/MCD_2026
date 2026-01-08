@@ -6,6 +6,9 @@ project:
     - map.qmd
     # Any file not listed here will be ignored by the build process
 
+execute:
+  freeze: auto
+
 website:
   title: "MCD_2026"
   navbar:
