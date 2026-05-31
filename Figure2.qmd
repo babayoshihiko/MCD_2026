@@ -40,15 +40,16 @@ MCD <- sf::read_sf(here::here("data","MCD.csv"),
         crs = 6668)
 MCD$Type <- ifelse(MCD$Type == 2, 1, MCD$Type)
 MCD$Type <- factor(MCD$Type, levels = c(1,3,4), labels=c("Core","Regional","Affiliated"))
+MCD <- MCD[MCD$code_pref %in% c("16", "17", "18", "21", "23", "24", "25", "26"), ]
 sfLabel <- sf::read_sf(here::here("data","label_SHA.geojson"))
 ```
 
 ```{r include=FALSE}
 Catchment <- sf::read_sf(here::here("data","MCD_isochrones.geojson"))
-Catchment <- dplyr::filter(Catchment, 
-                      value == 30000)
-Catchment$Catchment <- "30 kilometre by car from MCD"
-Catchment$Catchment <- factor(Catchment$Catchment)
+Catchment$Catchment <- factor(Catchment$value,
+                        levels=c(10000,30000),
+                        labels=c("30 kilometre by car from MCD","10 kilometre by car from MCD")
+                        )
 ```
 
 ```{r include=FALSE}
@@ -74,12 +75,13 @@ sfRI_small <- dplyr::right_join(N03_small, dfRI,
 ```{r include=FALSE}
 library(leaflet)
 library(leaflet.extras)
+bb <- sf::st_bbox(Catchment)
 pal_MCD <- colorFactor(
   palette = c("#e853b2", "#2e33a6", "#459a64"),
   domain = MCD$Type
 )
 pal_Catchment <- colorFactor(
-  palette = "green",
+  palette = c("lightgreen", "darkgreen"),
   domain = Catchment$Catchment
 )
 pal_A22 <- colorFactor(
@@ -112,15 +114,18 @@ jp_map <- addPolygons(jp_map, data=A24, color=~pal_A24(Mountainous), group="Moun
 jp_map <- addPolygons(jp_map, data=A25, group="Agricultural")
 jp_map <- addPolygons(jp_map, data=A18, group="Peninsula")
 jp_map <- addPolygons(jp_map, data=A38_nocentre, fillColor=NA, color="red", group="SHA")
-jp_map <- addPolygons(jp_map, data=Catchment, fillColor=NA, color="green", group="Catchment")
-jp_map <- addCircles(jp_map, data=MCD, color = "#ffffff", fillColor=~pal_MCD(Type), fillOpacity = 1, radius =1000, group="MCD")
+jp_map <- addPolygons(jp_map, data=Catchment, color=~pal_Catchment(Catchment), group="Catchment")
+jp_map <- addCircles(jp_map, data=MCD, stroke = FALSE, fillColor=~pal_MCD(Type), fillOpacity = 1, radius =1000, group="MCD")
 # jp_map <- addLegend(jp_map, pal=pal_A22, values=A22$Snowfall, title="Snowfall")
 # jp_map <- addLegend(jp_map, pal=pal_A24, values=A24$Mountainous, title="Mountainous")
 # jp_map <- addLegend(jp_map, pal=pal_A25, values=A25$Agricultural, title="Agricultural")
 # jp_map <- addLegend(jp_map, pal=pal_A18, values=A18$Peninsula, title="Peninsula")
 jp_map <- addLegend(jp_map, pal=pal_Catchment, values=Catchment$Catchment, title="Catchment")
 jp_map <- addLegend(jp_map, pal=pal_MCD, values=MCD$Type, title="MCD")
-jp_map <- addLayersControl(jp_map, overlayGroups = c("Snowfall", "Mountainous", "Agricultural", "Peninsula", "SHA", "Catchment", "MCD"))
+jp_map <- addLayersControl(jp_map, 
+            overlayGroups = c("Snowfall", "Mountainous", "Agricultural", "Peninsula", "SHA", "Catchment", "MCD"))
+jp_map <- hideGroup(jp_map, c("Snowfall", "Mountainous", "Agricultural", "Peninsula", "SHA"))
+jp_map <- fitBounds(jp_map, lng1 = unname(bb["xmin"]), lat1 = unname(bb["ymin"]), lng2 = unname(bb["xmax"]), lat2 = unname(bb["ymax"]))
 jp_map <- addFullscreenControl(jp_map)
 
 ```

@@ -15,9 +15,9 @@ Abstract: TBA
 
 ## Figures
 
-[Figure 1](Figure1.html)
+[Interactive Version of Figure 1](Figure1.html)
 
-[Figure 2](Figure2.html)
+[Interactive Version of Figure 2](Figure2.html)
 
 
 ## Data Sources
@@ -34,9 +34,9 @@ Abstract: TBA
 
 ## Codes
 
-https://github.com/babayoshihiko/MCD_2026
+[https://github.com/babayoshihiko/MCD_2026](https://github.com/babayoshihiko/MCD_2026)
 
-Please install *geojp* from GitHub.
+Please install **geojp** from GitHub.
 
 ```{r eval=FALSE}
 remotes::install_github("babayoshihiko/geojp")
