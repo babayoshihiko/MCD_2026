@@ -2,9 +2,25 @@
 title: "Home"
 ---
 
-[Interactive Map](map.html)
+This is a companion to a research article:
 
-Sources:
+Title: Geographic and Climatic Factors Driving Regional Variation in Medical Centres for Dementia in Japan: A Nationwide Geocomputational Analysis
+
+Journal: TBA
+
+DOI: TBA
+
+Abstract: TBA
+
+
+## Figures
+
+[Figure 1](Figure1.html)
+
+[Figure 2](Figure2.html)
+
+
+## Data Sources
 
 * Tile: GeoSpatial Information Authority of Japan, [https://maps.gsi.go.jp/development/ichiran.html](https://maps.gsi.go.jp/development/ichiran.html)
 
@@ -14,3 +30,15 @@ Sources:
 * Mountainous areas: [https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A24-2016.html](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A24-2016.html)
 * Agricultural areas: [https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A25-2016.html](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A25-2016.html)
 * Peninsula: [https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A18-2016.html](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A18-2016.html)
+
+
+## Codes
+
+https://github.com/babayoshihiko/MCD_2026
+
+Please install *geojp* from GitHub.
+
+```{r eval=FALSE}
+remotes::install_github("babayoshihiko/geojp")
+```
+

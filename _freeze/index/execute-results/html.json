@@ -1,0 +1,17 @@
+{
+  "hash": "d56bf56ce8dfd30872dea3f778d0065e",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Home\"\n---\n\nThis is a companion to a research article:\n\nTitle: Geographic and Climatic Factors Driving Regional Variation in Medical Centres for Dementia in Japan: A Nationwide Geocomputational Analysis\n\nJournal: TBA\n\nDOI: TBA\n\nAbstract: TBA\n\n\n## Figures\n\n[Figure 1](Figure1.html)\n\n[Figure 2](Figure2.html)\n\n\n## Data Sources\n\n* Tile: GeoSpatial Information Authority of Japan, [https://maps.gsi.go.jp/development/ichiran.html](https://maps.gsi.go.jp/development/ichiran.html)\n\n* Municipalities: [https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2025.html](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2025.html)\n* Healthcare areas: [https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A38-2020.html](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A38-2020.html)\n* Snowfall: [https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A22-2016.html](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A22-2016.html)\n* Mountainous areas: [https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A24-2016.html](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A24-2016.html)\n* Agricultural areas: [https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A25-2016.html](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A25-2016.html)\n* Peninsula: [https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A18-2016.html](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A18-2016.html)\n\n\n## Codes\n\nhttps://github.com/babayoshihiko/MCD_2026\n\nPlease install *geojp* from GitHub.\n\n\n::: {.cell}\n\n```{.r .cell-code}\nremotes::install_github(\"babayoshihiko/geojp\")\n```\n:::\n\n\n",
+    "supporting": [
+      "index_files"
+    ],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}
