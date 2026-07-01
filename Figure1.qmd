@@ -100,7 +100,7 @@ jp_map <- addPolygons(jp_map, data=A24, color=~pal_A24(Mountainous), group="Moun
 jp_map <- addPolygons(jp_map, data=A25, group="Agricultural")
 jp_map <- addPolygons(jp_map, data=A18, group="Peninsula")
 jp_map <- addPolygons(jp_map, data=A38_nocentre, fillColor=NA, color="red", group="SHA")
-jp_map <- addCircles(jp_map, data=MCD, color = "#ffffff", fillColor=~pal_MCD(Type), fillOpacity = 1, radius =1000, group="MCD")
+jp_map <- addCircles(jp_map, data=MCD, color = "#ffffff", fillColor=~pal_MCD(Type), fillOpacity = 1, radius =1000, weight=2, group="MCD")
 jp_map <- addLegend(jp_map, pal=pal_A22, values=A22$Snowfall, title="Snowfall")
 jp_map <- addLegend(jp_map, pal=pal_A24, values=A24$Mountainous, title="Mountainous")
 jp_map <- addLegend(jp_map, pal=pal_A25, values=A25$Agricultural, title="Agricultural")
