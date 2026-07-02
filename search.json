@@ -1,5 +1,12 @@
 [
   {
+    "objectID": "FigureS2.html",
+    "href": "FigureS2.html",
+    "title": "Figure 2",
+    "section": "",
+    "text": "Figure S1: Interactive Version of Figure 1\nBackground map tiles © Geospatial Information Authority of Japan (GSI)."
+  },
+  {
     "objectID": "index.html",
     "href": "index.html",
     "title": "Home",
@@ -11,7 +18,7 @@
     "href": "index.html#figures",
     "title": "Home",
     "section": "Figures",
-    "text": "Figures\nInteractive Version of Figure 1\nInteractive Version of Figure 2"
+    "text": "Figures\nFigure S1: Interactive Version of Figure 1\nFigure S2: Interactive Version of Figure 2"
   },
   {
     "objectID": "index.html#data-sources",
@@ -26,5 +33,12 @@
     "title": "Home",
     "section": "Codes",
     "text": "Codes\nhttps://github.com/babayoshihiko/MCD_2026\nPlease install geojp from GitHub.\n\nremotes::install_github(\"babayoshihiko/geojp\")"
+  },
+  {
+    "objectID": "FigureS1.html",
+    "href": "FigureS1.html",
+    "title": "Figure 1",
+    "section": "",
+    "text": "Figure S1: Interactive Version of Figure 1\nBackground map tiles © Geospatial Information Authority of Japan (GSI)."
   }
 ]
