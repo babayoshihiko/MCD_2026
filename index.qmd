@@ -15,9 +15,9 @@ Abstract: TBA
 
 ## Figures
 
-[Interactive Version of Figure 1](Figure1.html)
+Figure S1: [Interactive Version of Figure 1](FigureS1.html)
 
-[Interactive Version of Figure 2](Figure2.html)
+Figure S2: [Interactive Version of Figure 2](FigureS2.html)
 
 
 ## Data Sources

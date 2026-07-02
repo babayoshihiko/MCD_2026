@@ -64,6 +64,7 @@ sfRI_small <- dplyr::right_join(N03_small, dfRI,
 ```
 
 ```{r include=FALSE}
+library(htmlwidgets)
 library(leaflet)
 library(leaflet.extras)
 pal_MCD <- colorFactor(
@@ -92,8 +93,9 @@ pal_A18 <- colorFactor(
 
 jp_map <- leaflet()
 jp_map <- addTiles(jp_map, 
-                   urlTemplate = "https://cyberjapandata.gsi.go.jp/xyz/english/{z}/{x}/{y}.png",
-                   options = tileOptions(opacity = 0.5))
+    urlTemplate = "https://cyberjapandata.gsi.go.jp/xyz/english/{z}/{x}/{y}.png",
+    options = tileOptions(opacity = 0.5,
+                          attribution = '&copy; Geospatial Information Authority of Japan (GSI)'))
 jp_map <- addPolygons(jp_map, data=N03_small, fillColor=NA, color="lightgrey", group="Municipalicty")
 jp_map <- addPolygons(jp_map, data=A22, color=~pal_A22(Snowfall), group="Snowfall") #Snowfall
 jp_map <- addPolygons(jp_map, data=A24, color=~pal_A24(Mountainous), group="Mountainous")
@@ -108,9 +110,22 @@ jp_map <- addLegend(jp_map, pal=pal_A18, values=A18$Peninsula, title="Peninsula"
 jp_map <- addLegend(jp_map, pal=pal_MCD, values=MCD$Type, title="MCD")
 jp_map <- addLayersControl(jp_map, overlayGroups = c("Snowfall", "Mountainous", "Agricultural", "Peninsula", "SHA", "MCD"))
 jp_map <- addFullscreenControl(jp_map)
-
+jp_map <- onRender(
+  jp_map,
+  "
+  function(el, x) {
+    this.attributionControl.addAttribution(
+      '&copy; Geospatial Information Authority of Japan (GSI)'
+    );
+  }
+  "
+)
 ```
 
 ```{r echo=FALSE}
 jp_map
 ```
+
+Figure S1: Interactive Version of Figure 1
+
+Background map tiles © Geospatial Information Authority of Japan (GSI).
