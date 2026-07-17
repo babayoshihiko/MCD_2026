@@ -123,7 +123,8 @@ jp_map <- addCircles(jp_map, data=MCD, color = "#ffffff", fillColor=~pal_MCD(Typ
 # jp_map <- addLegend(jp_map, pal=pal_A25, values=A25$Agricultural, title="Agricultural")
 # jp_map <- addLegend(jp_map, pal=pal_A18, values=A18$Peninsula, title="Peninsula")
 jp_map <- addLegend(jp_map, pal=pal_Catchment, values=Catchment$Catchment, title="Catchment")
-jp_map <- addLegend(jp_map, pal=pal_MCD, values=MCD$Type, title="MCD")
+jp_map <- addLegend(jp_map, colors = "red", labels = "Secondary Healthcare Area", title = NULL)
+jp_map <- addLegend(jp_map, pal=pal_MCD, values=MCD$Type, title="Medical Centers for Dementia")
 jp_map <- addLayersControl(jp_map, 
             overlayGroups = c("Snowfall", "Mountainous", "Agricultural", "Peninsula", "SHA", "Catchment", "MCD"))
 jp_map <- hideGroup(jp_map, c("Snowfall", "Mountainous", "Agricultural", "Peninsula", "SHA"))
