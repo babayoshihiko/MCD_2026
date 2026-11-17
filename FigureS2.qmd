@@ -146,6 +146,6 @@ jp_map <- onRender(
 jp_map
 ```
 
-Figure S1: Interactive Version of Figure 1
+Figure S2: Interactive Version of Figure 2
 
 Background map tiles © Geospatial Information Authority of Japan (GSI).
